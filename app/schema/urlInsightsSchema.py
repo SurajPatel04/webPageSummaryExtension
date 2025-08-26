@@ -1,9 +1,11 @@
 from pydantic import BaseModel, AnyUrl
+from typing import List
 
 
-class urlIn(BaseModel):
+class UrlIn(BaseModel):
     url: AnyUrl
 
 
-class urlSummeryOut(BaseModel):
+class UrlSummeryOut(BaseModel):
     contentSummery: str
+
