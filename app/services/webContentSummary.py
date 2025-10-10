@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 from sse_starlette.sse import EventSourceResponse
 from app.core.llm import llmFlash
+from app.core.redis import redisClient
+from app.models.redisModel import RedisModel
 import os
 
 load_dotenv()
@@ -11,9 +13,10 @@ if not os.getenv("USER_AGENT"):
 
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 
-def pageContentSummary(url):
+def pageContentSummary(url, key=None):
     async def streamSummary():
         link = url
         user_agent = os.getenv("USER_AGENT", "MyLangChainApp/1.0")
@@ -21,6 +24,12 @@ def pageContentSummary(url):
 
         doc = loader.load()
         contentDoc = doc[0].page_content
+
+        embeddings = GoogleGenerativeAIEmbeddings(
+             model="gemini-embedding-001",
+             google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
+
         system_prompt = """You are an AI assistant. 
         Your task is to read the provided content and generate a clear, concise summary in **bullet points**. 
         Do not include unnecessary details. 
@@ -37,9 +46,17 @@ def pageContentSummary(url):
             SystemMessage(content=system_prompt),
             HumanMessage(content=query)
         ]
-
+        response = ""
         async for chunk in llmFlash.astream(msg):
+                response+=chunk.content
                 yield {"data": chunk.content}
 
+        data = RedisModel(
+            url=url,
+            uslSummery=response
+        )
+
+        redisClient.set("12",data.model_dump_json())
+        print(redisClient.get("12").decode("utf-8"))
     return EventSourceResponse(streamSummary())
 
